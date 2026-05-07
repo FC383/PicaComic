@@ -558,6 +558,13 @@ extension AddDownloadExt on DownloadManager {
 DownloadedItem? _getComicFromJson(String id, String json, DateTime time, [String? directory]) {
   DownloadedItem comic;
   try {
+        var decoded = jsonDecode(json);
+    if (decoded is! Map<String, dynamic>) {
+      // JSON 数据损坏，不是预期的 Map 类型
+      LogManager.addLog(
+          LogLevel.error, "IO", "Failed to get a downloaded comic info: json is not a Map<String, dynamic>");
+      return null;
+    }
     if (id.contains('-')) {
       comic = CustomDownloadedItem.fromJson(jsonDecode(json));
     } else if (id.startsWith("jm")) {
@@ -653,23 +660,31 @@ abstract mixin class _DownloadDb {
   }
 
   /// order: time, title, subtitle, size
-  List<DownloadedItem> getAll(
-      [String order = 'time', String direction = 'desc']) {
-    var result = _db!.select('''
-      select * from download
-      order by $order $direction
-    ''');
-    return result
-        .map(
-          (e) => _getComicFromJson(
-            e['id'],
-            e['json'],
-            DateTime.fromMillisecondsSinceEpoch(e['time']),
-            e['directory']
-          )!,
-        )
-        .toList();
+List<DownloadedItem> getAll(
+    [String order = 'time', String direction = 'desc']) {
+  var result = _db!.select('''
+    select * from download
+    order by $order $direction
+  ''');
+  var list = <DownloadedItem>[];
+  for (var e in result) {
+    var item = _getComicFromJson(
+      e['id'],
+      e['json'],
+      DateTime.fromMillisecondsSinceEpoch(e['time']),
+      e['directory']
+    );
+    if (item != null) {
+      list.add(item);
+    } else {
+      // 自动清理数据库中损坏的记录,不至于一条损坏,全部都读取不了.而且还可以自动修复
+      LogManager.addLog(
+        LogLevel.error, "IO", "Removing corrupted download record: ${e['id']}");
+      _deleteFromDb(e['id'] as String);
+    }
   }
+  return list;
+}
 
   static final _cache = <String, String>{};
 
