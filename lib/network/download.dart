@@ -668,22 +668,35 @@ List<DownloadedItem> getAll(
   ''');
   var list = <DownloadedItem>[];
   for (var e in result) {
-    var item = _getComicFromJson(
-      e['id'],
-      e['json'],
-      DateTime.fromMillisecondsSinceEpoch(e['time']),
-      e['directory']
-    );
-    if (item != null) {
-      list.add(item);
-    } else {
-      // 自动清理数据库中损坏的记录,不至于一条损坏,全部都读取不了.而且还可以自动修复
-      LogManager.addLog(
-        LogLevel.error, "IO", "Removing corrupted download record: ${e['id']}");
-      _deleteFromDb(e['id'] as String);
+    String? id;
+    try {
+      id = e['id'] as String;
+      var item = _getComicFromJson(
+        id,
+        e['json'] as String,
+        DateTime.fromMillisecondsSinceEpoch(e['time'] as int),
+        e['directory'] is String ? e['directory'] as String : null,
+      );
+      if (item != null) {
+        list.add(item);
+      } else {
+        _safeDelete(id);
+      }
+    } catch (_) {
+      if (id != null) {
+        _safeDelete(id);
+      }
     }
   }
   return list;
+}
+
+void _safeDelete(String id) {
+  try {
+    _deleteFromDb(id);
+  } catch (e) {
+    LogManager.addLog(LogLevel.error, "IO", "Failed to remove download record: $e");
+  }
 }
 
   static final _cache = <String, String>{};
