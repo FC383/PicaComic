@@ -139,7 +139,7 @@ extension ToolBar on ComicReadingPage {
                                 otherInfo["jmEpNames"] =
                                     readingData.eps!.values.toList();
                                 otherInfo["epsId"] = readingData.eps!.keys
-                                    .elementAt(logic.index - 1);
+                                    .elementAt(logic.order - 1);
                                 otherInfo["bookId"] = readingData.id;
                               }
                               if (logic.data.type != ComicType.other) {
