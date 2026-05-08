@@ -343,9 +343,17 @@ class _IsolateDownloader{
         }
         ZipFile.openAndExtract("$savePath/temp.zip", savePath);
         var files = Directory(savePath).listSync();
-        files.sort((a, b) => a.path.compareTo(b.path));
+        files.sort((a, b) {
+          int extractNumber(FileSystemEntity entity) {
+            var name = entity.path.split(pathSep).last;
+            var matches = RegExp(r'\d+').allMatches(name).toList();
+            if (matches.isEmpty) return 0;
+            return int.parse(matches.last.group(0)!);
+          }
+          return extractNumber(a).compareTo(extractNumber(b));
+        });
         int index = 0;
-        for(var entry in Directory(savePath).listSync()){
+        for(var entry in files){
           if(entry is File){
             var name = entry.path.split(pathSep).last;
             if(name.endsWith(".zip")){
