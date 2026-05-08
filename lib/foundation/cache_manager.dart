@@ -377,30 +377,28 @@ class CachingFile{
     }
   }
 
-  Future<void> close() async{
-    if(_buffer.isNotEmpty){
-      await file.writeAsBytes(_buffer, mode: FileMode.append);
-      _writtenBytes += _buffer.length;
-      _buffer.clear();
-    }
-    CacheManager()._db.execute('''
-      INSERT OR REPLACE INTO cache (key, dir, name, expires) VALUES (?, ?, ?, ?)
-    ''', [key, dir, name, DateTime.now().millisecondsSinceEpoch + 7 * 24 * 60 * 60 * 1000]);
-
-    // 追踪写入的缓存大小
-    final cm = CacheManager();
-    if (cm._sizeInitialized) {
-      cm._currentSize = cm._currentSize! + _writtenBytes;
-      if (cm._currentSize! > cm._limitSize) {
-        await cm.checkCache();
-        return;
-      }
-    } else {
-      cm._needCheckAfterInit = true;
-    }
-
-    await cm.checkCache();
+Future<void> close() async{
+  if(_buffer.isNotEmpty){
+    await file.writeAsBytes(_buffer, mode: FileMode.append);
+    _writtenBytes += _buffer.length;
+    _buffer.clear();
   }
+  CacheManager()._db.execute('''
+    INSERT OR REPLACE INTO cache (key, dir, name, expires) VALUES (?, ?, ?, ?)
+  ''', [key, dir, name, DateTime.now().millisecondsSinceEpoch + 7 * 24 * 60 * 60 * 1000]);
+  // 追踪写入的缓存大小
+  final cm = CacheManager();
+  if (cm._sizeInitialized) {
+    cm._currentSize = (cm._currentSize ?? 0) + _writtenBytes;
+    if ((cm._currentSize ?? 0) > cm._limitSize) {
+      await cm.checkCache();
+    }
+  } else {
+    cm._needCheckAfterInit = true;
+  }
+    //无条件触发改为按需触发
+  	//await cm.checkCache(); 
+}
 
   Future<void> cancel() async{
     // 如果已写入部分数据且 _currentSize 已追踪，需要扣减
