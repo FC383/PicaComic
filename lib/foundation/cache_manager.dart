@@ -150,12 +150,16 @@ class CacheManager {
     if(res.isEmpty){
       return null;
     }
-    var row = res.first;
-    var dir = row[1] as String;
-    var name = row[2] as String;
-    var file = File('$cachePath/$dir/$name');
-    if(await file.exists()){
-      return file.path;
+    try {
+      var row = res.first;
+      var dir = row[1] as String;
+      var name = row[2] as String;
+      var file = File('$cachePath/$dir/$name');
+      if(await file.exists()){
+        return file.path;
+      }
+    } catch (_) {
+      // 权限不足或文件系统异常时返回 null
     }
     return null;
   }
@@ -176,11 +180,15 @@ class CacheManager {
         WHERE expires < ?
       ''', [DateTime.now().millisecondsSinceEpoch]);
       for(var row in res){
-        var dir = row[1] as String;
-        var name = row[2] as String;
-        var file = File('$cachePath/$dir/$name');
-        if(await file.exists()){
-          await file.delete();
+        try {
+          var dir = row[1] as String;
+          var name = row[2] as String;
+          var file = File('$cachePath/$dir/$name');
+          if(await file.exists()){
+            await file.delete();
+          }
+        } catch (_) {
+          // 权限不足或文件被外部删除时跳过
         }
       }
       _db.execute('''
@@ -207,22 +215,29 @@ class CacheManager {
         ''');
         bool anyDeleted = false;
         for(var row in res3){
-          var key = row[0] as String;
-          var dir = row[1] as String;
-          var name = row[2] as String;
-          var file = File('$cachePath/$dir/$name');
-          if(await file.exists()){
-            var size = await file.length();
-            await file.delete();
-            _db.execute('DELETE FROM cache WHERE key = ?', [key]);
-            _currentSize = _currentSize! - size;
-            anyDeleted = true;
-            if(_currentSize! <= _limitSize && count - 1 <= 2000){
-              break;
+          int deletedCount = 0;
+          try {
+            var key = row[0] as String;
+            var dir = row[1] as String;
+            var name = row[2] as String;
+            var file = File('$cachePath/$dir/$name');
+            if(await file.exists()){
+              var size = await file.length();
+              await file.delete();
+              _db.execute('DELETE FROM cache WHERE key = ?', [key]);
+              _currentSize = _currentSize! - size;
+              anyDeleted = true;
+              deletedCount++;
+              if(_currentSize! <= _limitSize && count - deletedCount <= 2000){
+                break;
+              }
+            } else {
+              _db.execute('DELETE FROM cache WHERE key = ?', [key]);
+              anyDeleted = true;
+              deletedCount++;
             }
-          } else {
-            _db.execute('DELETE FROM cache WHERE key = ?', [key]);
-            anyDeleted = true;
+          } catch (_) {
+            // 权限不足或文件操作异常时跳过当前条目，继续处理下一个
           }
           count--;
         }
@@ -240,12 +255,16 @@ class CacheManager {
     int total = 0;
     final dir = Directory(path);
     if (!dir.existsSync()) return 0;
-    final List<FileSystemEntity> entries = dir.listSync();
+    final List<FileSystemEntity> entries = dir.listSync(followLinks: false);//防止目录包含软链接 / 符号链接（指向自身 / 上级目录），递归无限执行
     for (final entity in entries) {
-      if (entity is File) {
-        total += await entity.length();
-      } else if (entity is Directory) {
-        total += await _calcDirSize(entity.path);
+      try {
+        if (entity is File) {
+          total += await entity.length();
+        } else if (entity is Directory) {
+          total += await _calcDirSize(entity.path);
+        }
+      } catch (_) {
+        // 权限不足或文件被删除时跳过
       }
     }
     return total;
@@ -265,9 +284,14 @@ class CacheManager {
     var name = row[2] as String;
     var file = File('$cachePath/$dir/$name');
     var fileSize = 0;
-    if(await file.exists()){
-      fileSize = await file.length();
-      await file.delete();
+    try {
+      if(await file.exists()){
+        fileSize = await file.length();
+        await file.delete();
+      }
+    } catch (_) {
+      // 权限不足或文件被外部删除时跳过
+      fileSize = 0;
     }
     _db.execute('''
       DELETE FROM cache
@@ -279,7 +303,11 @@ class CacheManager {
   }
 
   Future<void> clear() async {
-    await Directory(cachePath).delete(recursive: true);
+    try {
+      await Directory(cachePath).delete(recursive: true);
+    } catch (_) {
+      // 权限不足时忽略
+    }
     Directory(cachePath).createSync(recursive: true);
     _db.execute('''
       DELETE FROM cache
@@ -299,10 +327,15 @@ class CacheManager {
       var name = row[2] as String;
       var file = File('$cachePath/$dir/$name');
       var fileSize = 0;
-      if(await file.exists()){
-        fileSize = await file.length();
-        await file.deleteIgnoreError();
+      try {
+        if(await file.exists()){
+          fileSize = await file.length();
+        }
+      } catch (_) {
+        // 权限不足或文件被外部删除时跳过
+        fileSize = 0;
       }
+      await file.deleteIgnoreError();
       _db.execute('''
         DELETE FROM cache
         WHERE key = ?
