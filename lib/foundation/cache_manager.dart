@@ -262,35 +262,36 @@ class CacheManager {
   }
 
   Future<void> delete(String key) async{
-    var res = _db.select('''
-      SELECT * FROM cache
-      WHERE key = ?
-    ''', [key]);
-    if(res.isEmpty){
-      return;
-    }
-    var row = res.first;
-    var dir = row[1] as String;
-    var name = row[2] as String;
-    var file = File('$cachePath/$dir/$name');
-    var fileSize = 0;
-    try {
-      if(await file.exists()){
-        fileSize = await file.length();
-        await file.delete();
+      var res = _db.select('''
+        SELECT * FROM cache
+        WHERE key = ?
+      ''', [key]);
+      if(res.isEmpty){
+        return;
       }
-    } catch (_) {
-      // 权限不足或文件被外部删除时跳过
-      fileSize = 0;
+      var row = res.first;
+      var dir = row[1] as String;
+      var name = row[2] as String;
+      var file = File('$cachePath/$dir/$name');
+  
+      try {
+        if(await file.exists()){
+          var fileSize = await file.length();
+          await file.delete();
+          // 只有文件真正删除成功，才清理 DB 和扣减大小
+          _db.execute('DELETE FROM cache WHERE key = ?', [key]);
+          if (_currentSize != null) {
+            _currentSize = _currentSize! - fileSize;
+          }
+        } else {
+          // 文件已被外部删除，只清理 DB 记录
+          _db.execute('DELETE FROM cache WHERE key = ?', [key]);
+        }
+      } catch (_) {
+        // 文件操作失败，保留 DB 记录不删除
+        // 下次 delete() 或 checkCache() 会重试
+      }
     }
-    _db.execute('''
-      DELETE FROM cache
-      WHERE key = ?
-    ''', [key]);
-    if (_currentSize != null) {
-      _currentSize = _currentSize! - fileSize;
-    }
-  }
 
   Future<void> clear() async {
     try {
