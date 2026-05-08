@@ -24,10 +24,6 @@ class CacheManager {
 
   int get limitSize => _limitSize;
 
-  /// 修改 2：延迟初始化标记，避免在构造函数中执行重量级 IO
-  bool _sizeInitialized = false;
-  bool _needCheckAfterInit = false;
-
   CacheManager._create(){
     Directory(cachePath).createSync(recursive: true);
     _db = sqlite3.open('${App.dataPath}/cache.db');
@@ -48,25 +44,18 @@ class CacheManager {
     } catch (e) {
       // ignore
     }
-    // 延迟初始化目录大小：避免在构造函数中执行重量级 IO（修改 2）
     _initCurrentSize();
   }
 
   factory CacheManager() => instance ??= CacheManager._create();
 
-  /// 修改 2：异步初始化目录大小，使用安全的 _calcDirSize 避免 isolate OOM
+  /// 异步初始化目录大小，使用安全的 _calcDirSize 避免 isolate OOM
   Future<void> _initCurrentSize() async {
     try {
       _currentSize = await _calcDirSize(cachePath);
     } catch (e) {
-      // 初始化失败回退为 0，避免 _sizeInitialized 为 true 但 _currentSize 为 null 时空指针
+      // 初始化失败回退为 0
       _currentSize = 0;
-    } finally {
-      _sizeInitialized = true;
-      if (_needCheckAfterInit) {
-        _needCheckAfterInit = false;
-        await checkCache();
-      }
     }
   }
 
@@ -75,7 +64,7 @@ class CacheManager {
   void setLimitSize(int size){
     _limitSize = size * 1024 * 1024;
     // 如果当前缓存已超过新限制，触发清理
-    if (_sizeInitialized && _currentSize! > _limitSize) {
+    if (_currentSize != null && _currentSize! > _limitSize) {
       checkCache();
     }
   }
@@ -99,7 +88,6 @@ class CacheManager {
     return res.first[0];
   }
 
-  /// 修改 3：使用 _sizeInitialized 替代 _currentSize != null，新增 _needCheckAfterInit 分支
   Future<void> writeCache(String key, Uint8List data, [int duration = 7 * 24 * 60 * 60 * 1000]) async{
   this.dir++;
   this.dir %= 100;
@@ -126,13 +114,11 @@ class CacheManager {
     rethrow;
   }
 
-  if (_sizeInitialized) {
-    _currentSize = (_currentSize ?? 0) + data.length;
-    if ((_currentSize ?? 0) > _limitSize) {
+  if (_currentSize != null) {
+    _currentSize = _currentSize! + data.length;
+    if (_currentSize! > _limitSize) {
       await checkCache();
     }
-  } else {
-    _needCheckAfterInit = true;
   }
 }
 
@@ -275,7 +261,6 @@ class CacheManager {
     return total;
   }
 
-  /// 修改 5：使用 _sizeInitialized 替代 _currentSize != null
   Future<void> delete(String key) async{
     var res = _db.select('''
       SELECT * FROM cache
@@ -302,7 +287,7 @@ class CacheManager {
       DELETE FROM cache
       WHERE key = ?
     ''', [key]);
-    if (_sizeInitialized) {
+    if (_currentSize != null) {
       _currentSize = _currentSize! - fileSize;
     }
   }
@@ -320,7 +305,6 @@ class CacheManager {
     _currentSize = 0;
   }
 
-  /// 修改 7：空 finally → deleteIgnoreError；修改 5：_currentSize != null → _sizeInitialized
   Future<void> deleteKeyword(String keyword) async{
     var res = _db.select('''
       SELECT * FROM cache
@@ -345,7 +329,7 @@ class CacheManager {
         DELETE FROM cache
         WHERE key = ?
       ''', [key]);
-      if (_sizeInitialized) {
+      if (_currentSize != null) {
         _currentSize = _currentSize! - fileSize;
       }
     }
@@ -388,23 +372,19 @@ Future<void> close() async{
   ''', [key, dir, name, DateTime.now().millisecondsSinceEpoch + 7 * 24 * 60 * 60 * 1000]);
   // 追踪写入的缓存大小
   final cm = CacheManager();
-  if (cm._sizeInitialized) {
-    cm._currentSize = (cm._currentSize ?? 0) + _writtenBytes;
-    if ((cm._currentSize ?? 0) > cm._limitSize) {
+  if (cm._currentSize != null) {
+    cm._currentSize = cm._currentSize! + _writtenBytes;
+    if (cm._currentSize! > cm._limitSize) {
       await cm.checkCache();
     }
-  } else {
-    cm._needCheckAfterInit = true;
   }
-    //无条件触发改为按需触发
-  	//await cm.checkCache(); 
 }
 
   Future<void> cancel() async{
     // 如果已写入部分数据且 _currentSize 已追踪，需要扣减
     if (_writtenBytes > 0) {
       final cm = CacheManager();
-      if (cm._sizeInitialized) {
+      if (cm._currentSize != null) {
         cm._currentSize = cm._currentSize! - _writtenBytes;
       }
     }
@@ -415,7 +395,7 @@ Future<void> close() async{
     // 重置前扣减已追踪的大小
     if (_writtenBytes > 0) {
       final cm = CacheManager();
-      if (cm._sizeInitialized) {
+      if (cm._currentSize != null) {
         cm._currentSize = cm._currentSize! - _writtenBytes;
       }
     }
