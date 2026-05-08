@@ -101,32 +101,40 @@ class CacheManager {
 
   /// 修改 3：使用 _sizeInitialized 替代 _currentSize != null，新增 _needCheckAfterInit 分支
   Future<void> writeCache(String key, Uint8List data, [int duration = 7 * 24 * 60 * 60 * 1000]) async{
-    this.dir++;
-    this.dir %= 100;
-    var dir = this.dir;
-    var name = md5.convert(Uint8List.fromList(key.codeUnits)).toString();
-    var file = File('$cachePath/$dir/$name');
-    while(await file.exists()){
-      name = md5.convert(Uint8List.fromList(name.codeUnits)).toString();
-      file = File('$cachePath/$dir/$name');
-    }
+  this.dir++;
+  this.dir %= 100;
+  var dir = this.dir;
+  var name = md5.convert(Uint8List.fromList(key.codeUnits)).toString();
+  var file = File('$cachePath/$dir/$name');
+  while(await file.exists()){
+    name = md5.convert(Uint8List.fromList(name.codeUnits)).toString();
+    file = File('$cachePath/$dir/$name');
+  }
+
+  // 先写入 DB 记录，再写文件：确保 DB 是文件的权威来源
+  var expires = DateTime.now().millisecondsSinceEpoch + duration;
+  _db.execute('''
+    INSERT OR REPLACE INTO cache (key, dir, name, expires) VALUES (?, ?, ?, ?)
+  ''', [key, dir.toString(), name, expires]);
+
+  try {
     await file.create(recursive: true);
     await file.writeAsBytes(data);
-    var expires = DateTime.now().millisecondsSinceEpoch + duration;
-    _db.execute('''
-      INSERT OR REPLACE INTO cache (key, dir, name, expires) VALUES (?, ?, ?, ?)
-    ''', [key, dir.toString(), name, expires]);
-
-    if (_sizeInitialized) {
-      _currentSize = _currentSize! + data.length;
-      if (_currentSize! > _limitSize) {
-        await checkCache();
-      }
-    } else {
-      // 目录大小尚未初始化完成，标记待初始化后补执行 checkCache
-      _needCheckAfterInit = true;
-    }
+  } catch (e) {
+    // 文件写入失败，回滚 DB 记录，防止 DB 中存在无对应文件的记录
+    _db.execute('DELETE FROM cache WHERE key = ?', [key]);
+    rethrow;
   }
+
+  if (_sizeInitialized) {
+    _currentSize = (_currentSize ?? 0) + data.length;
+    if ((_currentSize ?? 0) > _limitSize) {
+      await checkCache();
+    }
+  } else {
+    _needCheckAfterInit = true;
+  }
+}
 
   Future<CachingFile> openWrite(String key) async{
     this.dir++;
