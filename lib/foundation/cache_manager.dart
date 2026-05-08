@@ -62,12 +62,14 @@ class CacheManager {
   /// set cache size limit in MB
   /// 修改 4：缩小限制时立即触发清理
   void setLimitSize(int size){
-    _limitSize = size * 1024 * 1024;
-    // 如果当前缓存已超过新限制，触发清理
-    if (_currentSize != null && _currentSize! > _limitSize) {
-      checkCache();
+      _limitSize = size * 1024 * 1024;
+      if (_currentSize != null && _currentSize! > _limitSize) {
+        checkCache().catchError((_) {
+          // ignore: checkCache 失败不影响 setLimitSize，下次写入或手动触发会重试
+        });
+      }
     }
-  }
+
 
   void setType(String key, String? type){
     _db.execute('''
