@@ -215,7 +215,6 @@ class CacheManager {
         ''');
         bool anyDeleted = false;
         for(var row in res3){
-          int deletedCount = 0;
           try {
             var key = row[0] as String;
             var dir = row[1] as String;
@@ -227,17 +226,15 @@ class CacheManager {
               _db.execute('DELETE FROM cache WHERE key = ?', [key]);
               _currentSize = _currentSize! - size;
               anyDeleted = true;
-              deletedCount++;
-              if(_currentSize! <= _limitSize && count - deletedCount <= 2000){
+              if(_currentSize! <= _limitSize && count - 1 <= 2000){
                 break;
               }
             } else {
               _db.execute('DELETE FROM cache WHERE key = ?', [key]);
               anyDeleted = true;
-              deletedCount++;
             }
-          } catch (_) {
-            // 权限不足或文件操作异常时跳过当前条目，继续处理下一个
+          } catch (_) { 
+            //// 权限不足或文件操作异常时跳过当前条目，继续处理下一个
           }
           count--;
         }
