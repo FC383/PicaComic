@@ -432,14 +432,14 @@ extension ToolBar on ComicReadingPage {
         id: "ToolBar",
         builder: (logic) {
           var epName = readingData.eps?.values
-                  .elementAtOrNull(logic.order - 1) ??
+                  .elementAtOrNull(comicReadingPageLogic.order - 1) ??
               "E1";
           if (epName.length > 8) {
             epName = "${epName.substring(0, 8)}...";
           }
           var text = readingData.hasEp
-              ? "$epName : ${logic.index}/${logic.urls.length}"
-              : "${logic.index}/${logic.urls.length}";
+              ? "$epName : ${comicReadingPageLogic.index}/${comicReadingPageLogic.urls.length}"
+              : "${comicReadingPageLogic.index}/${comicReadingPageLogic.urls.length}";
           return GestureDetector(
             onTap: () => _showPageJumpDialog(context, logic),
             child: Stack(
