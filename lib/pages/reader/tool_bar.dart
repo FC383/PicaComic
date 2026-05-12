@@ -492,7 +492,8 @@ extension ToolBar on ComicReadingPage {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    "请输入 1-$maxPage 之间的页数",
+                    "请输入 @min-@max 之间的页数"
+                        .tlParams({"min": "1", "max": maxPage.toString()}),
                     style: TextStyle(
                       fontSize: 14,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -507,7 +508,7 @@ extension ToolBar on ComicReadingPage {
                       FilteringTextInputFormatter.allow(RegExp(r'[0-9]'))
                     ],
                     decoration: InputDecoration(
-                      hintText: "页数",
+                      hintText: "页数".tl,
                       errorText: errorText,
                       border: const OutlineInputBorder(),
                     ),
@@ -559,7 +560,8 @@ extension ToolBar on ComicReadingPage {
       return "请输入有效的数字".tl;
     }
     if (page < 1 || page > maxPage) {
-      return "页数超出范围 (1-$maxPage)".tl;
+      return "页数超出范围 (@min-@max)"
+          .tlParams({"min": "1", "max": maxPage.toString()});
     }
     return null;
   }
