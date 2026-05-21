@@ -680,9 +680,11 @@ List<DownloadedItem> getAll(
       if (item != null) {
         list.add(item);
       } else {
+        _tryCleanDisk(e['directory']);
         _safeDelete(id);
       }
     } catch (_) {
+      _tryCleanDisk(e['directory']);
       if (id != null) {
         _safeDelete(id);
       }
@@ -698,7 +700,13 @@ void _safeDelete(String id) {
     LogManager.addLog(LogLevel.error, "IO", "Failed to remove download record: $e");
   }
 }
-
+void _tryCleanDisk(dynamic directory) {
+  if (directory is! String || directory.isEmpty) return;
+  try {
+    final d = Directory("${DownloadManager().path}/$directory");
+    if (d.existsSync()) d.deleteSync(recursive: true);
+  } catch (_) {}
+}
   static final _cache = <String, String>{};
 
   String getDirectory(String id) {
