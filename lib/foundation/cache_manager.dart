@@ -193,17 +193,18 @@ class CacheManager {
       ''', [DateTime.now().millisecondsSinceEpoch]);
 
       // 第二步：获取当前条目数
-      int count = 0;
-      var res2 = _db.select('SELECT COUNT(*) FROM cache');
-      if(res2.isNotEmpty){
-        count = res2.first[0] as int;
-      }
+      // int count = 0;
+      // var res2 = _db.select('SELECT COUNT(*) FROM cache');
+      // if(res2.isNotEmpty){
+      //   count = res2.first[0] as int;
+      // }
 
       // 第三步：在主 isolate 中直接计算目录大小（移除 compute，避免 isolate OOM）
       _currentSize = await _calcDirSize(cachePath);
 
       // 第四步：循环清理直到满足限制
-      while (_currentSize! > _limitSize || count > 2000) {
+      // while (_currentSize! > _limitSize || count > 2000) {
+      while (_currentSize! > _limitSize) {
         var res3 = _db.select('''
           SELECT * FROM cache
           ORDER BY expires ASC
@@ -222,7 +223,8 @@ class CacheManager {
               _db.execute('DELETE FROM cache WHERE key = ?', [key]);
               _currentSize = _currentSize! - size;
               anyDeleted = true;
-              if(_currentSize! <= _limitSize && count - 1 <= 2000){
+              // if(_currentSize! <= _limitSize && count - 1 <= 2000){
+              if(_currentSize! <= _limitSize){
                 break;
               }
             } else {
@@ -232,7 +234,7 @@ class CacheManager {
           } catch (_) { 
             //// 权限不足或文件操作异常时跳过当前条目，继续处理下一个
           }
-          count--;
+          // count--;
         }
         if (!anyDeleted) {
           break; // 防止死循环：数据库中还有记录但文件都已不存在
