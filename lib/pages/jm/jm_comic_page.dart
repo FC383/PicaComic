@@ -203,7 +203,7 @@ class JmComicPage extends BaseComicPage<JmComicInfo> {
 
   @override
   Future<JmComicInfo?> loadLocalData() async {
-    String title, cover, subTitle;
+    String title = '', cover = '', subTitle = '';
     bool found = false;
     final h = pageHistory;
     if (h != null && h.title.isNotEmpty) {
