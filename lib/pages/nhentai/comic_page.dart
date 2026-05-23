@@ -247,7 +247,7 @@ class NhentaiComicPage extends BaseComicPage<NhentaiComic> {
   
   @override
   Future<NhentaiComic?> loadLocalData() async {
-    String title, cover, subTitle;
+    String title = '', cover = '', subTitle = '';
     bool found = false;
     final h = pageHistory;
     if (h != null && h.title.isNotEmpty) {
