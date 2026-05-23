@@ -139,7 +139,7 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
       return ComicInfoData(
         downloaded.name,
         downloaded.subTitle,
-        downloaded.cover,
+        _logic.history?.cover ?? '',
         null,                            // description: 本地无
         _tagsListToMap(downloaded.tags), // tags: 从下载记录恢复
         downloaded is CustomDownloadedItem
