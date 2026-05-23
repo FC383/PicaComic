@@ -40,7 +40,28 @@ class PicacgComicPage extends BaseComicPage<ComicItem> {
 
   @override
   bool get isLiked => data!.isLiked;
+  
+  @override
+  Future<ComicItem?> loadLocalData() async {
+    final h = _logic.history;
+    if (h == null || h.title.isEmpty) return null;
+    try {
+      return ComicItem.fromJson({
+        "creator": {"id": "", "title": "", "email": "", "name": "",
+                     "level": 0, "exp": 0, "avatarUrl": "",
+                     "frameUrl": null, "isPunched": null, "slogan": null},
+        "id": id,
+        "title": h.title,
+        "thumbUrl": h.cover,
+        "description": "", "author": h.subtitle, "chineseTeam": "",
+        "categories": <String>[], "tags": <String>[],
+        "likes": 0, "comments": 0, "isLiked": false, "isFavourite": false,
+        "epsCount": 0, "time": "", "pagesCount": 0
+      });
+    } catch (_) { return null; }
+  }
 
+  
   @override
   void openFavoritePanel() {
     favoriteComic(FavoriteComicWidget(
