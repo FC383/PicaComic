@@ -51,7 +51,24 @@ class EhGalleryPage extends BaseComicPage<Gallery> {
           ),
         );
       };
+  
+  @override
+  Future<Gallery?> loadLocalData() async {
+    final h = _logic.history;
+    if (h == null || h.title.isEmpty) return null;
+    try {
+      return Gallery.fromJson({
+        "title": h.title, "subTitle": h.subtitle,
+        "type": "", "time": "", "uploader": h.subtitle,
+        "stars": 0.0, "rating": null, "coverPath": h.cover,
+        "tags": <String, List<String>>{}, "favorite": false,
+        "link": id, "maxPage": "0", "pageSize": 20,
+        "ext": "jpg", "width": 100
+      });
+    } catch (_) { return null; }
+  }
 
+  
   @override
   String? get cover => (comicCover ?? data?.coverPath)
       ?.replaceFirst("s.exhentai.org", "ehgt.org");
