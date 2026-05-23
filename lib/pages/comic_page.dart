@@ -18,6 +18,7 @@ import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/foundation/stack.dart' as stack;
 import 'package:pica_comic/foundation/ui_mode.dart';
 import 'package:pica_comic/network/base_comic.dart';
+import 'package:pica_comic/network/custom_download_model.dart';
 import 'package:pica_comic/network/download.dart';
 import 'package:pica_comic/network/res.dart';
 import 'package:pica_comic/pages/favorites/local_favorites.dart';
@@ -160,7 +161,68 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
 
   @override
   Future<bool> loadFavorite(ComicInfoData data) async {
-    return data.isFavorite ?? false;
+    bool platformFavorite = data.isFavorite ?? false;
+    bool localFavorite = LocalFavoritesManager().isExist(id);
+    return platformFavorite || localFavorite;
+  }
+
+  @override
+  Future<ComicInfoData?> loadLocalData() async {
+    final downloadId = DownloadManager().generateId(sourceKey, id);
+
+    // 优先级1：已下载的记录（数据最完整：title、cover、tags、可能包含 chapters）
+    DownloadedItem? downloaded;
+    try {
+      if (DownloadManager().isExists(downloadId)) {
+        downloaded = await DownloadManager().getComicOrNull(downloadId);
+      }
+    } catch (_) {}
+
+    if (downloaded != null) {
+      return ComicInfoData(
+        downloaded.name,
+        downloaded.subTitle,
+        downloaded.cover,
+        null,
+        _tagsListToMap(downloaded.tags),
+        downloaded is CustomDownloadedItem
+            ? (downloaded as CustomDownloadedItem).chapters
+            : null,
+        null,
+        null,
+        0,
+        null,
+        sourceKey,
+        id,
+      );
+    }
+
+    // 优先级2：阅读历史（已在 get() 阶段1中查询，存在 _logic.history 中）
+    final h = _logic.history;
+    if (h != null && h.title.isNotEmpty) {
+      return ComicInfoData(
+        h.title,
+        h.subtitle,
+        h.cover,
+        null,
+        {},
+        null,
+        null,
+        null,
+        0,
+        null,
+        sourceKey,
+        id,
+      );
+    }
+
+    return null;
+  }
+
+  /// 辅助方法：将 List<String> tags 转为 Map<String, List<String>>
+  static Map<String, List<String>> _tagsListToMap(List<String> tags) {
+    if (tags.isEmpty) return {};
+    return {"tags": tags};
   }
 
   @override
@@ -599,28 +661,56 @@ class ComicPageLogic<T extends Object> extends StateController {
   int colorIndex = 0;
   bool? favoriteOnPlatform;
 
+  /// 网络加载失败时的信息（有本地数据时网络失败用 toast 展示，不阻塞页面）
+  String? networkMessage;
+
+  /// 由 [BaseComicPage] 在首次构建时注入，指向子类的 loadLocalData 方法
+  Future<T?> Function()? loadLocalData;
+
   void get(Future<Res<T>> Function() loadData,
       Future<bool> Function(T) loadFavorite, String Function() getId) async {
+    // ======== 阶段1：加载本地数据和历史 ========
+    history = await HistoryManager().find(getId());
+
+    if (loadLocalData != null) {
+      var local = await loadLocalData!();
+      if (local != null) {
+        data = local;
+        favorite = await loadFavorite(local);
+        loading = false;
+        update();
+      }
+    }
+
+    // ======== 阶段2：加载网络数据 ========
     var [res, _] = await Future.wait(
         [loadData(), Future.delayed(const Duration(milliseconds: 300))]);
+
     if (res.error) {
-      message = res.errorMessage;
-      if (message == "Exit") {
-        loading = false;
-        return;
+      if (data == null) {
+        message = res.errorMessage;
+        if (message == "Exit") {
+          loading = false;
+          return;
+        }
+      } else {
+        networkMessage = res.errorMessage;
       }
     } else {
       data = res.data;
       favorite = await loadFavorite(res.data);
+      message = null;
+      networkMessage = null;
     }
+
     loading = false;
-    history = await HistoryManager().find(getId());
     update();
   }
 
   void refresh_() {
     data = null;
     message = null;
+    networkMessage = null;
     loading = true;
     update();
   }
@@ -729,6 +819,11 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
 
   Future<bool> loadFavorite(T data);
 
+  /// 从本地数据源加载漫画信息。
+  /// 返回非 null 时，页面将立即渲染本地数据，同时后台继续加载网络数据。
+  /// 默认返回 null（保持现有行为，不启用本地加载）。
+  Future<T?> loadLocalData() async => null;
+
   /// used for history
   String get id;
 
@@ -791,6 +886,7 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
             _logic.width = constraints.maxWidth;
             _logic.height = constraints.maxHeight;
             if (logic.loading) {
+              logic.loadLocalData = loadLocalData;
               logic.get(loadData, loadFavorite, () => id);
               return buildLoading(context);
             } else if (logic.message != null) {
@@ -802,6 +898,14 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
               _logic.thumbnailsData ??= thumbnailsCreator;
               logic.controller.removeListener(scrollListener);
               logic.controller.addListener(scrollListener);
+
+              if (logic.networkMessage != null) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  showToast(message: logic.networkMessage!);
+                  logic.networkMessage = null;
+                });
+              }
+
               return SmoothCustomScrollView(
                 controller: logic.controller,
                 slivers: [
