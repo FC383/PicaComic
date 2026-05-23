@@ -247,7 +247,7 @@ class NhentaiComicPage extends BaseComicPage<NhentaiComic> {
   
   @override
   Future<NhentaiComic?> loadLocalData() async {
-    final h = _logic.history;
+    final h = pageHistory;
     if (h == null || h.title.isEmpty) return null;
     try {
       return NhentaiComic.fromMap({
