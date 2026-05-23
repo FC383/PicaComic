@@ -43,7 +43,7 @@ class PicacgComicPage extends BaseComicPage<ComicItem> {
   
 @override
   Future<ComicItem?> loadLocalData() async {
-    String title, cover, subTitle;
+    String title = '', cover = '', subTitle = '';
     bool found = false;
     final h = pageHistory;
     if (h != null && h.title.isNotEmpty) {
