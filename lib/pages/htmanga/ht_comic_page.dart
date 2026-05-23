@@ -177,6 +177,20 @@ class HtComicPage extends BaseComicPage<HtComicInfo> {
 
   @override
   String get sourceKey => 'htmanga';
+
+  @override
+  Future<HtComicInfo?> loadLocalData() async {
+    final h = _logic.history;
+    if (h == null || h.title.isEmpty) return null;
+    try {
+      return HtComicInfo.fromJson({
+        "id": id, "coverPath": h.cover, "name": h.title,
+        "category": "", "pages": 0, "tags": <String, String>{},
+        "description": "", "uploader": h.subtitle,
+        "avatar": "", "uploadNum": 0
+      });
+    } catch (_) { return null; }
+  }
 }
 
 class HtComicPageLogic extends StateController {
