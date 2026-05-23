@@ -203,7 +203,7 @@ class JmComicPage extends BaseComicPage<JmComicInfo> {
 
   @override
   Future<JmComicInfo?> loadLocalData() async {
-    final h = _logic.history;
+    final h = pageHistory;
     if (h == null || h.title.isEmpty) return null;
     try {
       return JmComicInfo.fromMap({
