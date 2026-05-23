@@ -54,7 +54,7 @@ class EhGalleryPage extends BaseComicPage<Gallery> {
   
   @override
   Future<Gallery?> loadLocalData() async {
-    String title, cover, subTitle;
+    String title = '', cover = '', subTitle = '';
     bool found = false;
     final h = pageHistory;
     if (h != null && h.title.isNotEmpty) {
