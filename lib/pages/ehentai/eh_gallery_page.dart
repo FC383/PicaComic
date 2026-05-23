@@ -54,7 +54,7 @@ class EhGalleryPage extends BaseComicPage<Gallery> {
   
   @override
   Future<Gallery?> loadLocalData() async {
-    final h = _logic.history;
+    final h = pageHistory;
     if (h == null || h.title.isEmpty) return null;
     try {
       return Gallery.fromJson({
