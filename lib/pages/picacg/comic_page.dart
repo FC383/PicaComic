@@ -41,7 +41,7 @@ class PicacgComicPage extends BaseComicPage<ComicItem> {
   @override
   bool get isLiked => data!.isLiked;
   
-@override
+  @override
   Future<ComicItem?> loadLocalData() async {
     String title = '', cover = '', subTitle = '';
     bool found = false;
