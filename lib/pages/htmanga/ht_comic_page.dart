@@ -180,7 +180,7 @@ class HtComicPage extends BaseComicPage<HtComicInfo> {
 
   @override
   Future<HtComicInfo?> loadLocalData() async {
-    final h = _logic.history;
+    final h = pageHistory;
     if (h == null || h.title.isEmpty) return null;
     try {
       return HtComicInfo.fromJson({
