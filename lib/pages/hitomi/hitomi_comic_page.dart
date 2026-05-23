@@ -210,6 +210,19 @@ class HitomiComicPage extends BaseComicPage<HitomiComic> {
 
   @override
   String get sourceKey => "hitomi";
+
+  @override
+  Future<HitomiComic?> loadLocalData() async {
+    final h = _logic.history;
+    if (h == null || h.title.isEmpty) return null;
+    try {
+      return HitomiComic(
+        link, h.title, <int>[], "", <String>[h.subtitle],
+        "", <Tag>[], <Tag>[], <Tag>[], "",
+        <HitomiFile>[], <String>[], h.cover,
+      );
+    } catch (_) { return null; }
+  }
 }
 
 void _downloadComic(
