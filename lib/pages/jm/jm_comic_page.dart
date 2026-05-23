@@ -199,6 +199,22 @@ class JmComicPage extends BaseComicPage<JmComicInfo> {
 
   @override
   String get sourceKey => "jm";
+
+
+  @override
+  Future<JmComicInfo?> loadLocalData() async {
+    final h = _logic.history;
+    if (h == null || h.title.isEmpty) return null;
+    try {
+      return JmComicInfo.fromMap({
+        "name": h.title, "id": id,
+        "author": <String>[h.subtitle],
+        "description": "", "series": <String, String>{},
+        "tags": <String>[], "works": <String>[],
+        "actors": <String>[], "epNames": <String>[]
+      });
+    } catch (_) { return null; }
+  }
 }
 
 void downloadComic(JmComicInfo comic, BuildContext context) async {
