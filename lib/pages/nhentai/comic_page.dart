@@ -244,4 +244,16 @@ class NhentaiComicPage extends BaseComicPage<NhentaiComic> {
 
   @override
   String get sourceKey => 'nhentai';
+  
+  @override
+  Future<NhentaiComic?> loadLocalData() async {
+    final h = _logic.history;
+    if (h == null || h.title.isEmpty) return null;
+    try {
+      return NhentaiComic.fromMap({
+        "id": id, "title": h.title,
+        "subTitle": h.subtitle, "cover": h.cover,
+      });
+    } catch (_) { return null; }
+  }
 }
