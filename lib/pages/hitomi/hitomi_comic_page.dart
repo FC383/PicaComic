@@ -213,7 +213,7 @@ class HitomiComicPage extends BaseComicPage<HitomiComic> {
 
   @override
   Future<HitomiComic?> loadLocalData() async {
-    String title, cover, subTitle;
+    String title = '', cover = '', subTitle = '';
     bool found = false;
     final h = pageHistory;
     if (h != null && h.title.isNotEmpty) {
