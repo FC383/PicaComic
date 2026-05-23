@@ -81,7 +81,7 @@ class PicacgComicPage extends BaseComicPage<ComicItem> {
         "description": "", "author": subTitle, "chineseTeam": "",
         "categories": <String>[], "tags": <String>[],
         "likes": 0, "comments": 0, "isLiked": false, "isFavourite": false,
-        "epsCount": 0, "time": "", "pagesCount": 0
+        "epsCount": 0, "time": "0000-00-00 00:00:00", "pagesCount": 0
       });
     } catch (_) { return null; }
   }
