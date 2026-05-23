@@ -43,7 +43,7 @@ class PicacgComicPage extends BaseComicPage<ComicItem> {
   
   @override
   Future<ComicItem?> loadLocalData() async {
-    final h = _logic.history;
+    final h = pageHistory;
     if (h == null || h.title.isEmpty) return null;
     try {
       return ComicItem.fromJson({
