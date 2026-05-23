@@ -19,6 +19,7 @@ import 'package:pica_comic/foundation/log.dart';
 import 'package:pica_comic/foundation/stack.dart' as stack;
 import 'package:pica_comic/foundation/ui_mode.dart';
 import 'package:pica_comic/network/base_comic.dart';
+import 'package:pica_comic/network/download_model.dart';
 import 'package:pica_comic/network/download.dart';
 import 'package:pica_comic/network/res.dart';
 import 'package:pica_comic/pages/favorites/local_favorites.dart';
