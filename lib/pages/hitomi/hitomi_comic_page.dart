@@ -213,7 +213,7 @@ class HitomiComicPage extends BaseComicPage<HitomiComic> {
 
   @override
   Future<HitomiComic?> loadLocalData() async {
-    final h = _logic.history;
+    final h = pageHistory;
     if (h == null || h.title.isEmpty) return null;
     try {
       return HitomiComic(
