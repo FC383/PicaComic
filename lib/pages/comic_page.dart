@@ -183,15 +183,15 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
         downloaded.name,
         downloaded.subTitle,
         downloaded.cover,
-        null,
-        _tagsListToMap(downloaded.tags),
+        null,                            // description: 本地无
+        _tagsListToMap(downloaded.tags), // tags: 从下载记录恢复
         downloaded is CustomDownloadedItem
             ? (downloaded as CustomDownloadedItem).chapters
-            : null,
-        null,
-        null,
+            : null,                      // chapters: 仅 CustomDownloadedItem 有
+        null,                            // thumbnails: 本地无
+        null,                            // thumbnailLoader: 本地无
         0,
-        null,
+        null,                            // suggestions: 本地无
         sourceKey,
         id,
       );
@@ -204,13 +204,13 @@ class _ComicPageImpl extends BaseComicPage<ComicInfoData> {
         h.title,
         h.subtitle,
         h.cover,
-        null,
-        {},
-        null,
-        null,
-        null,
+        null,                            // description
+        {},                              // tags: 无
+        null,                            // chapters: 无
+        null,                            // thumbnails
+        null,                            // thumbnailLoader
         0,
-        null,
+        null,                            // suggestions
         sourceKey,
         id,
       );
