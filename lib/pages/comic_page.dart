@@ -822,6 +822,8 @@ abstract class BaseComicPage<T extends Object> extends StatelessWidget {
   @nonVirtual
   set favorite(bool f) => _logic.favorite = f;
 
+  History? get pageHistory => _logic.history;
+
   Future<bool> loadFavorite(T data);
 
   /// used for history
