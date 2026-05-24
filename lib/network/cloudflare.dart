@@ -118,22 +118,17 @@ void passCloudflare(CloudflareException e, void Function() onFinished) async {
     var webview = DesktopWebview(
       initialUrl: url,
       onTitleChange: (title, controller) async {
-        var res = await controller.evaluateJavascript(
-            "document.head.innerHTML.includes('#challenge-success-text')");
-        if (res == 'false') {
-          var ua = controller.userAgent;
-          if (ua != null) {
-            appdata.implicitData[3] = ua;
-            appdata.writeImplicitData();
-          }
           var cookiesMap = await controller.getCookies(url);
-          if(cookiesMap['cf_clearance'] == null) {
-            return;
+          if (cookiesMap['cf_clearance'] != null) {
+              var ua = controller.userAgent;
+              if (ua != null) {
+                  appdata.implicitData[3] = ua;
+                  appdata.writeImplicitData();
+              }
+              saveCookies(cookiesMap);
+              controller.close();
+              onFinished();
           }
-          saveCookies(cookiesMap);
-          controller.close();
-          onFinished();
-        }
       },
     );
     webview.open();
@@ -143,31 +138,27 @@ void passCloudflare(CloudflareException e, void Function() onFinished) async {
         initialUrl: url,
         singlePage: true,
         onTitleChange: (title, controller) async {
-          var res = await controller.platform.evaluateJavascript(
-              source:
-                  "document.head.innerHTML.includes('#challenge-success-text')");
-          if (res == false) {
-            var ua = await controller.getUA();
-            if (ua != null) {
-              appdata.implicitData[3] = ua;
-              appdata.writeImplicitData();
-            }
             var cookiesMap = await controller.getCookies(url) ?? {};
-            if(cookiesMap['cf_clearance'] == null) {
-              return;
+            if (cookiesMap['cf_clearance'] != null) {
+                var ua = await controller.getUA();
+                if (ua != null) {
+                    appdata.implicitData[3] = ua;
+                    appdata.writeImplicitData();
+                }
+                saveCookies(cookiesMap);
+                App.globalBack();
             }
-            saveCookies(cookiesMap);
-            App.globalBack();
-          }
         },
         onStarted: (controller) async {
-          var ua = await controller.getUA();
-          if (ua != null) {
-            appdata.implicitData[3] = ua;
-            appdata.writeImplicitData();
-          }
-          var cookiesMap = await controller.getCookies(url) ?? {};
-          saveCookies(cookiesMap);
+            var ua = await controller.getUA();
+            if (ua != null) {
+                appdata.implicitData[3] = ua;
+                appdata.writeImplicitData();
+            }
+            var cookiesMap = await controller.getCookies(url) ?? {};
+            if (cookiesMap['cf_clearance'] != null) {
+                saveCookies(cookiesMap);
+            }
         },
       ),
     );
