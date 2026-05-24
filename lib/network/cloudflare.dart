@@ -120,6 +120,11 @@ void passCloudflare(CloudflareException e, void Function() onFinished) async {
       onTitleChange: (title, controller) async {
           var cookiesMap = await controller.getCookies(url);
           if (cookiesMap['cf_clearance'] != null) {
+              var isChallenge = await controller.evaluateJavascript(
+                  "typeof _cf_chl_opt !== 'undefined'");
+              if (isChallenge == 'true') {
+                  return;
+              }
               var ua = controller.userAgent;
               if (ua != null) {
                   appdata.implicitData[3] = ua;
@@ -140,6 +145,11 @@ void passCloudflare(CloudflareException e, void Function() onFinished) async {
         onTitleChange: (title, controller) async {
             var cookiesMap = await controller.getCookies(url) ?? {};
             if (cookiesMap['cf_clearance'] != null) {
+                var isChallenge = await controller.platform.evaluateJavascript(
+                    source: "typeof _cf_chl_opt !== 'undefined'");
+                if (isChallenge == true) {
+                    return;
+                }
                 var ua = await controller.getUA();
                 if (ua != null) {
                     appdata.implicitData[3] = ua;
@@ -154,10 +164,6 @@ void passCloudflare(CloudflareException e, void Function() onFinished) async {
             if (ua != null) {
                 appdata.implicitData[3] = ua;
                 appdata.writeImplicitData();
-            }
-            var cookiesMap = await controller.getCookies(url) ?? {};
-            if (cookiesMap['cf_clearance'] != null) {
-                saveCookies(cookiesMap);
             }
         },
       ),
