@@ -218,9 +218,15 @@ class EhDownloadingItem extends DownloadingItem{
     }
   }
 
-  void finish() async{
-    onFinish?.call();
-  }
+void finish() async{
+    try {
+      onFinish?.call();
+    } catch (e, s) {
+      LogManager.addLog(LogLevel.error, "Download", "Finish error: $e\n$s");
+      onError?.call();
+    }
+}
+
 
   @override
   pause() async{
