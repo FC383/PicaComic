@@ -350,30 +350,47 @@ class _IsolateDownloader{
           sendPort.send(status);
         }
         ZipFile.openAndExtract("$savePath/temp.zip", savePath);
-        var files = Directory(savePath).listSync();
-        files.sort((a, b) {
-          int extractNumber(FileSystemEntity entity) {
-            var name = entity.path.split(pathSep).last;
-            var matches = RegExp(r'\d+').allMatches(name).toList();
-            if (matches.isEmpty) return 0;
-            return int.parse(matches.last.group(0)!);
-          }
-          return extractNumber(a).compareTo(extractNumber(b));
-        });
-        int index = 0;
-        for(var entry in files){
-          if(entry is File){
-            var name = entry.path.split(pathSep).last;
-            if(name.endsWith(".zip")){
-              entry.deleteSync();
-            } else if(!name.contains("cover")){
-              var baseName = index.toString();
-              index++;
-              var ext = name.split(".").last;
-              entry.renameSync("$savePath/$baseName.$ext");
+        var files = Directory(savePath)
+            .listSync()
+            .whereType<File>()
+            .where((f) => !f.path.endsWith(".zip") && !f.path.contains("cover"))
+            .toList();
+    
+        // 自然排序：按文件名中交替出现的文本段和数字段依次比较
+        int naturalCompare(String a, String b) {
+          final regex = RegExp(r'(\D+)|(\d+)');
+          final aParts = regex.allMatches(a).map((m) => m.group(0)!).toList();
+          final bParts = regex.allMatches(b).map((m) => m.group(0)!).toList();
+        
+          for (int i = 0; i < aParts.length && i < bParts.length; i++) {
+            final numA = int.tryParse(aParts[i]);
+            final numB = int.tryParse(bParts[i]);
+        
+            if (numA != null && numB != null) {
+              final cmp = numA.compareTo(numB);
+              if (cmp != 0) return cmp;
+            } else {
+              final cmp = aParts[i].compareTo(bParts[i]);
+              if (cmp != 0) return cmp;
             }
           }
+          return aParts.length.compareTo(bParts.length);
         }
+        
+        files.sort((a, b) {
+          final nameA = a.path.split(pathSep).last;
+          final nameB = b.path.split(pathSep).last;
+          return naturalCompare(nameA, nameB);
+        });
+        
+        for (int index = 0; index < files.length; index++) {
+          final entry = files[index];
+          final ext = entry.path.split(".").last;
+          entry.renameSync("$savePath/$index.$ext");
+        }
+        
+        // 删除 zip 文件
+        File("$savePath/temp.zip").deleteSync();
         sendPort.send("finish");
       }
       catch(e, s){
