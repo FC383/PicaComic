@@ -192,20 +192,22 @@ class EhDownloadingItem extends DownloadingItem{
           _downloadLink = res.data;
         }
         _downloader = _IsolateDownloader(
-            _downloadLink!,
-            path,
-            (current, total, speed){
-              _currentBytes = current;
-              _totalBytes = total;
-              _currentSpeed = speed;
-              updateInfo?.call();
-              if(current == total){
-                if (DownloadManager().downloading.firstOrNull != this) return;
-                finish();
-              }
-            },
-            onError!
-        );
+    _downloadLink!,
+    path,
+    (current, total, speed){
+      _currentBytes = current;
+      _totalBytes = total;
+      _currentSpeed = speed;
+      if(current == total){
+        if (DownloadManager().downloading.firstOrNull != this) return;
+        finish();                                  // _onFinish 中已含 _saveInfo → 通知
+      } else {
+        updateInfo?.call();                        // 只在未完成时通知进度
+      }
+    },
+    onError!
+);
+
         _downloader!.start();
       }
       catch(e, s){
