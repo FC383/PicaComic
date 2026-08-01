@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
@@ -31,37 +30,45 @@ class CacheManager {
 
   int get limitSize => _limitSize;
 
-  /// 扫描缓存目录, 统计有效缓存大小并找出孤立文件
-  static Future<int> _scanDir(String dbPath, String cacheDir) async {
-    final res = await Isolate.run(() async {
-      int totalSize = 0;
-      final unmanagedFiles = <String>[];
-      var db = sqlite3.open(dbPath);
-      try {
-        var d = Directory(cacheDir);
-        if (await d.exists()) {
-          await for (var entity in d.list(recursive: true)) {
-            if (entity is File) {
-              var segs = entity.uri.pathSegments;
-              var name = segs.last;
-              var dirName = segs.length >= 2 ? segs[segs.length - 2] : "*";
-              var rows = db.select(
-                'SELECT * FROM cache WHERE dir = ? AND name = ?',
-                [dirName, name],
-              );
-              if (rows.isEmpty) {
-                unmanagedFiles.add(entity.path);
-              } else {
-                totalSize += await entity.length();
-              }
+  /// compute 回调: 在后台 isolate 中扫描缓存目录
+  ///
+  /// 必须是无捕获的静态方法, 以便在 web 平台由 compute 降级为同线程执行。
+  static Future<Map<String, Object?>> _scanDirCallback(
+      List<String> args) async {
+    final dbPath = args[0];
+    final cacheDir = args[1];
+    int totalSize = 0;
+    final unmanagedFiles = <String>[];
+    var db = sqlite3.open(dbPath);
+    try {
+      var d = Directory(cacheDir);
+      if (await d.exists()) {
+        await for (var entity in d.list(recursive: true)) {
+          if (entity is File) {
+            var segs = entity.uri.pathSegments;
+            var name = segs.last;
+            var dirName = segs.length >= 2 ? segs[segs.length - 2] : "*";
+            var rows = db.select(
+              'SELECT * FROM cache WHERE dir = ? AND name = ?',
+              [dirName, name],
+            );
+            if (rows.isEmpty) {
+              unmanagedFiles.add(entity.path);
+            } else {
+              totalSize += await entity.length();
             }
           }
         }
-      } finally {
-        db.dispose();
       }
-      return {'totalSize': totalSize, 'unmanagedFiles': unmanagedFiles};
-    });
+    } finally {
+      db.dispose();
+    }
+    return {'totalSize': totalSize, 'unmanagedFiles': unmanagedFiles};
+  }
+
+  /// 扫描缓存目录, 统计有效缓存大小并找出孤立文件
+  static Future<int> _scanDir(String dbPath, String cacheDir) async {
+    final res = await compute(_scanDirCallback, [dbPath, cacheDir]);
     // 主 isolate 中删除孤立文件并清理数据库记录
     for (var filePath in res['unmanagedFiles'] as List<String>) {
       var file = File(filePath);
@@ -118,6 +125,10 @@ class CacheManager {
 
   /// set cache size limit in MB
   void setLimitSize(int size){
+    if(size <= 0){
+      // 非法值忽略, 防止 _limitSize <= 0 导致缓存被全部清空
+      return;
+    }
     _limitSize = size * 1024 * 1024;
   }
 
@@ -141,6 +152,18 @@ class CacheManager {
   }
 
   Future<void> writeCache(String key, Uint8List data, [int duration = 7 * 24 * 60 * 60 * 1000]) async{
+    // 删除该 key 的旧缓存文件, 防止 INSERT OR REPLACE 后旧文件永久残留
+    var oldPath = await findCache(key);
+    if(oldPath != null){
+      var oldFile = File(oldPath);
+      if(await oldFile.exists()){
+        var oldSize = await oldFile.length();
+        await oldFile.delete();
+        if(_currentSize != null){
+          _currentSize = _currentSize! - oldSize;
+        }
+      }
+    }
     this.dir++;
     this.dir %= 100;
     var dir = this.dir;
@@ -152,7 +175,9 @@ class CacheManager {
     }
     await file.create(recursive: true);
     await file.writeAsBytes(data);
-    var expires = DateTime.now().millisecondsSinceEpoch + duration;
+    // duration <= 0 表示永久缓存 (expires = 0), 与 findCache/checkCache 的 expires > 0 判断配合
+    var expires =
+        duration <= 0 ? 0 : DateTime.now().millisecondsSinceEpoch + duration;
     _db.execute('''
       INSERT OR REPLACE INTO cache (key, dir, name, expires) VALUES (?, ?, ?, ?)
     ''', [key, dir.toString(), name, expires]);
@@ -165,6 +190,8 @@ class CacheManager {
   }
 
   Future<CachingFile> openWrite(String key) async{
+    // 删除该 key 的旧缓存文件, 防止同一 key 多次流式写入时旧文件永久残留
+    await delete(key);
     this.dir++;
     this.dir %= 100;
     var dir = this.dir;
@@ -193,8 +220,8 @@ class CacheManager {
     var file = File('$cachePath/$dir/$name');
     var now = DateTime.now().millisecondsSinceEpoch;
 
-    // 过期缓存直接删除并返回 null
-    if(expires < now){
+    // 过期缓存直接删除并返回 null (expires <= 0 视为永久缓存, 不过期)
+    if(expires > 0 && expires < now){
       _db.execute('''
         DELETE FROM cache
         WHERE key = ?
@@ -209,14 +236,15 @@ class CacheManager {
       return null;
     }
 
-    // 命中缓存, LRU 续期 7 天
+    // 命中缓存, LRU 续期 7 天 (永久缓存 expires <= 0 不续期)
     if(await file.exists()){
-      var newExpires = now + 7 * 24 * 60 * 60 * 1000;
-      _db.execute('''
-        UPDATE cache
-        SET expires = ?
-        WHERE key = ?
-      ''', [newExpires, key]);
+      if(expires > 0){
+        _db.execute('''
+          UPDATE cache
+          SET expires = ?
+          WHERE key = ?
+        ''', [now + 7 * 24 * 60 * 60 * 1000, key]);
+      }
       return file.path;
     }
 
@@ -238,7 +266,7 @@ class CacheManager {
     try {
       var res = _db.select('''
         SELECT * FROM cache
-        WHERE expires < ?
+        WHERE expires > 0 AND expires < ?
       ''', [DateTime.now().millisecondsSinceEpoch]);
       for(var row in res){
         var dir = row[1] as String;
@@ -254,7 +282,7 @@ class CacheManager {
       }
       _db.execute('''
         DELETE FROM cache
-        WHERE expires < ?
+        WHERE expires > 0 AND expires < ?
       ''', [DateTime.now().millisecondsSinceEpoch]);
 
       int count = 0;
@@ -268,17 +296,33 @@ class CacheManager {
       compute((path) => Directory(path).size, cachePath)
           .then((value) => _currentSize = value);
 
+      // 防御: 初始化扫描未完成时 _currentSize 可能为 null,
+      // 若 count > 2000 会进入 while 循环, 循环内 _currentSize! 将崩溃
+      if(_currentSize == null && count > 2000){
+        _currentSize = await Directory(cachePath).size;
+      }
+
       while((_currentSize != null && _currentSize! > _limitSize) ||  count > 2000){
+        // 淘汰排除永久缓存 (expires <= 0)
         var res = _db.select('''
           SELECT * FROM cache
+          WHERE expires > 0
           ORDER BY expires ASC
           limit 10
         ''');
-        // 数据库中无记录但磁盘仍超限, 直接清空缓存目录
         if(res.isEmpty){
-          await Directory(cachePath).delete(recursive: true);
-          Directory(cachePath).createSync(recursive: true);
-          _currentSize = 0;
+          // 无可淘汰的临时缓存 (expires > 0)。
+          // 仅当数据库已完全为空 (磁盘上都是孤立文件) 时才全清,
+          // 避免永久缓存 (expires <= 0) 占满空间时被无差别删除。
+          var countRes = _db.select('''
+            SELECT COUNT(*) FROM cache
+          ''');
+          var dbCount = countRes.isEmpty ? 0 : countRes.first[0] as int;
+          if(dbCount == 0){
+            await Directory(cachePath).delete(recursive: true);
+            Directory(cachePath).createSync(recursive: true);
+            _currentSize = 0;
+          }
           break;
         }
         for(var row in res){
@@ -403,6 +447,10 @@ class CachingFile{
     CacheManager()._db.execute('''
       INSERT OR REPLACE INTO cache (key, dir, name, expires) VALUES (?, ?, ?, ?)
     ''', [key, dir, name, DateTime.now().millisecondsSinceEpoch + 7 * 24 * 60 * 60 * 1000]);
+    // 将流式写入的文件大小计入全局缓存容量
+    if(CacheManager()._currentSize != null){
+      CacheManager()._currentSize = CacheManager()._currentSize! + await file.length();
+    }
     await CacheManager().checkCache();
   }
 
