@@ -54,9 +54,8 @@ class _DownloadingPageState extends State<DownloadingPage> {
   Widget build(BuildContext context) {
     var widgets = <Widget>[];
     for (var i in comics) {
-      // 使用实例身份区分任务, 即使队列中出现 id 相同的任务也不会冲突
-      Key key = ObjectKey(i);
-      if (identical(i, comics.first)) {
+      var key = Key(i.id);
+      if(i == comics.first) {
         key = this.key;
       }
 
@@ -189,7 +188,7 @@ class _DownloadingTileState extends State<_DownloadingTile> {
   @override
   void didUpdateWidget(covariant _DownloadingTile oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(widget.comic, comic)) {
+    if (widget.comic != comic) {
       setState(() {
         comic = widget.comic;
       });
@@ -197,7 +196,7 @@ class _DownloadingTileState extends State<_DownloadingTile> {
   }
 
   void updateStatistic() {
-    if (!identical(comic, DownloadManager().downloading.first)) {
+    if(comic != DownloadManager().downloading.first) {
       return;
     }
     comic = DownloadManager().downloading.first;
@@ -308,7 +307,7 @@ class _DownloadingTileState extends State<_DownloadingTile> {
 
   String getProgressText() {
     if (pagesCount == null) {
-      if (identical(comic, DownloadManager().downloading.first)) {
+      if (comic == DownloadManager().downloading.first) {
         return "获取图片信息...".tl;
       } else {
         return "";

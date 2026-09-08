@@ -200,10 +200,7 @@ class EhDownloadingItem extends DownloadingItem{
               _currentSpeed = speed;
               updateInfo?.call();
               if(current == total){
-                if (!identical(
-                    DownloadManager().downloading.firstOrNull, this)) {
-                  return;
-                }
+                if (DownloadManager().downloading.firstOrNull != this) return;
                 finish();
               }
             },

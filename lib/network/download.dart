@@ -236,11 +236,11 @@ class DownloadManager with _DownloadDb implements Listenable {
 
   /// move comic to first
   void moveToFirst(DownloadingItem item) {
-    if (identical(downloading.first, item)) {
+    if (downloading.first == item) {
       return;
     }
     pause();
-    downloading.removeWhere((element) => identical(element, item));
+    downloading.remove(item);
     downloading.addFirst(item);
     start();
   }
