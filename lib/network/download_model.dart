@@ -257,7 +257,7 @@ abstract class DownloadingItem with _TransferSpeedMixin {
       }
 
       // finish downloading
-      if (DownloadManager().downloading.firstOrNull != this) return;
+      if (!identical(DownloadManager().downloading.firstOrNull, this)) return;
       onFinish?.call();
       _stopAllTasks();
     } catch (e, s) {
